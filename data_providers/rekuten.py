@@ -1,16 +1,19 @@
 import tempfile
 import os
 import scipy.io
-
+import cv2
+import glob
+import csv
+from scipy import misc
 
 import numpy as np
 
 from .base_provider import ImagesDataSet, DataProvider
-from .downloader import download_data_url
+# from .downloader import download_data_url
 
 
-class SVHNDataSet(ImagesDataSet):
-    n_classes = 10
+class RekutenDataSet(ImagesDataSet):
+    n_classes = 37
 
     def __init__(self, images, labels, shuffle, normalization):
         """
@@ -58,7 +61,7 @@ class SVHNDataSet(ImagesDataSet):
             return images_slice, labels_slice
 
 
-class SVHNDataProvider(DataProvider):
+class RekutenDataProvider(DataProvider):
     def __init__(self, save_path=None, validation_set=None,
                  validation_split=None, shuffle=False, normalization=None,
                  one_hot=True, **kwargs):
@@ -79,19 +82,17 @@ class SVHNDataProvider(DataProvider):
                     chanel data by it's standart deviation
             one_hot: `bool`, return lasels one hot encoded
         """
-        # self._save_path = save_path
-        self.save_path = '../../../svhn_data/'
+        self._save_path = save_path
         train_images = []
         train_labels = []
         for part in ['train', 'extra']:
             images, labels = self.get_images_and_labels(part, one_hot)
+            # print "shape",images.shape
             train_images.append(images)
-            print images.shape
             train_labels.append(labels)
         train_images = np.vstack(train_images)
-        print "shape",len(train_images)
+        # print "after shape",len(train_images)
         if one_hot:
-            print train_labels[:100]
             train_labels = np.vstack(train_labels)
         else:
             train_labels = np.hstack(train_labels)
@@ -103,42 +104,85 @@ class SVHNDataProvider(DataProvider):
             valid_labels = train_labels[valid_indexes]
             train_images = train_images[train_indexes]
             train_labels = train_labels[train_indexes]
-            self.validation = SVHNDataSet(
+            self.validation = RekutenDataSet(
                 valid_images, valid_labels, shuffle, normalization)
 
-        self.train = SVHNDataSet(
+        self.train = RekutenDataSet(
             train_images, train_labels, shuffle, normalization)
-        print "train: ", np.shape(train_images), train_labels.shape
 
         test_images, test_labels = self.get_images_and_labels('test', one_hot)
-        self.test = SVHNDataSet(test_images, test_labels, False, normalization)
-        print "test: ", np.shape(test_images), test_labels.shape
+        self.test = RekutenDataSet(test_images, test_labels, False, normalization)
 
         if validation_set and not validation_split:
             self.validation = self.test
-    def get_images_and_labels(self, name_part, one_hot=False):
-        url = self.data_url + name_part + '_32x32.mat'
-        download_data_url(url, self.save_path)
-        filename = os.path.join(self.save_path, name_part + '_32x32.mat')
-        data = scipy.io.loadmat(filename)
-        images = data['X'].transpose(3, 0, 1, 2)
-        labels = data['y'].reshape((-1))
-        labels[labels == 10] = 0
-        if one_hot:
-            labels = self.labels_to_one_hot(labels)
-        print "pre image shape",images.shape
-        print "pre label shape",labels.shape
 
-        return images, labels
+    def get_images_and_labels(self, name_part, one_hot=False):
+        # print name_part
+        size = 100
+        ratio = [7,2,1]
+        sum = ratio[0] +ratio[1] +ratio[2]
+        split1 = int(float(ratio[0]) / float(sum) * size)
+        split2 = int(float(ratio[1]) / float(sum) * size)
+        split3 = int(float(ratio[2]) / float(sum) * size)
+        print "splits", split1,split2,split3
+        img = np.ndarray(shape=(size, 180, 180, 3))
+        receipe_list = []
+        cat_list = []
+        lbl = np.ndarray(shape=(size, ),dtype=int)
+        i = 0
+        dir_path = "../../training-data/train.csv"
+        with open(dir_path, 'rb') as csvfile:
+            spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+            for row in spamreader:
+                if i >= size -1:
+                    break;
+                array = row[0].split(',')
+                receipe = array[0].split('.')[0]
+                receipe_list.append(receipe)
+                cat_list.append(array[1])
+                i = i + 1
+        i = 0
+        # print cat_list
+        for receipe in receipe_list:
+            myFile = "../../training-data/train-images/" + str(receipe) + ".jpg"
+            image = cv2.imread(myFile)
+            image = misc.imresize(image, (180, 180))
+            img[i] = image
+            lbl[i] = cat_list[receipe_list.index(receipe)][0]
+            i = i + 1
+        # labels = lbl.reshape((-1))
+        if one_hot:
+             lbl = self.labels_to_one_hot(lbl)
+        if name_part == 'train':
+            images = img[:split1, :, :]
+            labels = lbl[:split1]
+            # print "Image: ", images.shape
+            # print "Label: ", labels.shape
+            # print "Label: ", labels
+            return images, labels
+        elif name_part == 'extra':
+            images = img[split1:(split1+split2), :, :]
+            labels = lbl[split1:(split1+split2)]
+            # print "Images: ", images
+            # print "Label: ", labels
+            # print "Image: ", images.shape
+            # print "Label: ", labels.shape
+            return images, labels
+        else:
+            images = img[-split3:, :, :]
+            labels = lbl[-split3:]
+            # print "Image: ", images.shape
+            # print "Label: ", labels.shape
+            return images, labels
 
     @property
     def n_classes(self):
-        return 10
+        return 37
 
     @property
     def save_path(self):
         if self._save_path is None:
-            self._save_path = os.path.join(tempfile.gettempdir(), 'svhn')
+            self._save_path = os.path.join(tempfile.gettempdir(), 'Rekuten')
         return self._save_path
 
     @property
@@ -147,36 +191,36 @@ class SVHNDataProvider(DataProvider):
 
     @property
     def data_shape(self):
-        return (32, 32, 3)
+        return (180, 180, 3)
 
 
 if __name__ == '__main__':
     # WARNING: this test will require about 5 GB of RAM
-    import matplotlib.pyplot as plt
-
-    def plot_images_labels(images, labels, axes, main_label):
-        plt.text(0, 1.5, main_label, ha='center', va='top',
-                 transform=axes[len(axes) // 2].transAxes)
-        for image, label, axe in zip(images, labels, axes):
-            axe.imshow(image)
-            axe.set_title(np.argmax(label))
-            axe.set_axis_off()
-
-    n_plots = 10
-    fig, axes = plt.subplots(nrows=2, ncols=n_plots)
-
-    dataset = SVHNDataProvider()
-    plot_images_labels(
-        dataset.train.images[:n_plots],
-        dataset.train.labels[:n_plots],
-        axes[0],
-        'Original dataset')
-
-    dataset = SVHNDataProvider(shuffle=True)
-    plot_images_labels(
-        dataset.train.images[:n_plots],
-        dataset.train.labels[:n_plots],
-        axes[1],
-        'Shuffled dataset')
-
-    plt.show()
+    # import matplotlib.pyplot as plt
+    #
+    # def plot_images_labels(images, labels, axes, main_label):
+    #     plt.text(0, 1.5, main_label, ha='center', va='top',
+    #              transform=axes[len(axes) // 2].transAxes)
+    #     for image, label, axe in zip(images, labels, axes):
+    #         axe.imshow(image)
+    #         axe.set_title(np.argmax(label))
+    #         axe.set_axis_off()
+    #
+    # n_plots = 10
+    # fig, axes = plt.subplots(nrows=2, ncols=n_plots)
+    #
+    dataset = RekutenDataProvider()
+    # plot_images_labels(
+    #     dataset.train.images[:n_plots],
+    #     dataset.train.labels[:n_plots],
+    #     axes[0],
+    #     'Original dataset')
+    #
+    dataset = RekutenDataProvider(shuffle=True)
+    # plot_images_labels(
+    #     dataset.train.images[:n_plots],
+    #     dataset.train.labels[:n_plots],
+    #     axes[1],
+    #     'Shuffled dataset')
+    #
+    # plt.show()

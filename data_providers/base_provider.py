@@ -40,6 +40,7 @@ class ImagesDataSet(DataSet):
         return self._stds
 
     def shuffle_images_and_labels(self, images, labels):
+        print "image shape",images.shape[0]
         rand_indexes = np.random.permutation(images.shape[0])
         shuffled_images = images[rand_indexes]
         shuffled_labels = labels[rand_indexes]

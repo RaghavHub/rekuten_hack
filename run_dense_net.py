@@ -27,12 +27,25 @@ train_params_svhn = {
     'normalization': 'divide_255',
 }
 
+train_params_rekuten = {
+    'batch_size': 10,
+    'n_epochs': 1,
+    'initial_learning_rate': 0.1,
+    'reduce_lr_epoch_1': 20,
+    'reduce_lr_epoch_2': 30,
+    'validation_set': True,
+    'validation_split': None,  # you may set it 6000 as in the paper
+    'shuffle': True,  # shuffle dataset evclearery epoch or not
+    'normalization': 'divide_255',
+}
 
 def get_train_params_by_name(name):
     if name in ['C10', 'C10+', 'C100', 'C100+']:
         return train_params_cifar
-    if name == 'SVHN':
+    if name in 'SVHN':
         return train_params_svhn
+    if name in 'rekuten':
+        return train_params_rekuten
 
 
 if __name__ == '__main__':
@@ -60,7 +73,7 @@ if __name__ == '__main__':
         help='Depth of whole network, restricted to paper choices')
     parser.add_argument(
         '--dataset', '-ds', type=str,
-        choices=['C10', 'C10+', 'C100', 'C100+', 'SVHN'],
+        choices=['C10', 'C10+', 'C100', 'C100+', 'SVHN', 'rekuten'],
         default='C10',
         help='What dataset should be used')
     parser.add_argument(
@@ -115,7 +128,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not args.keep_prob:
-        if args.dataset in ['C10', 'C100', 'SVHN']:
+        if args.dataset in ['C10', 'C100', 'SVHN', 'rekuten']:
             args.keep_prob = 0.8
         else:
             args.keep_prob = 1.0

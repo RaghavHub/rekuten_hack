@@ -123,7 +123,8 @@ class DenseNet:
             save_path = self._save_path
         except AttributeError:
             save_path = 'saves/%s' % self.model_identifier
-            os.makedirs(save_path, exist_ok=True)
+            # os.makedirs(save_path, exist_ok=True)
+            os.makedirs(save_path)
             save_path = os.path.join(save_path, 'model.chkpt')
             self._save_path = save_path
         return save_path
@@ -136,7 +137,7 @@ class DenseNet:
             logs_path = 'logs/%s' % self.model_identifier
             if self.renew_logs:
                 shutil.rmtree(logs_path, ignore_errors=True)
-            os.makedirs(logs_path, exist_ok=True)
+            os.makedirs(logs_path)
             self._logs_path = logs_path
         return logs_path
 
@@ -173,14 +174,17 @@ class DenseNet:
     def _define_inputs(self):
         shape = [None]
         shape.extend(self.data_shape)
+        # print "data_shape",self.data_shape
         self.images = tf.placeholder(
             tf.float32,
             shape=shape,
             name='input_images')
+
         self.labels = tf.placeholder(
             tf.float32,
             shape=[None, self.n_classes],
             name='labels')
+        # print "Label placeholder",np.shape(self.labels)
         self.learning_rate = tf.placeholder(
             tf.float32,
             shape=[],
@@ -337,6 +341,7 @@ class DenseNet:
                 self.images,
                 out_features=self.first_output_features,
                 kernel_size=3)
+        # print np.shape(self.images)
 
         # add N required blocks
         for block in range(self.total_blocks):
@@ -416,12 +421,14 @@ class DenseNet:
         for i in range(num_examples // batch_size):
             batch = data.next_batch(batch_size)
             images, labels = batch
+            # print "Labels size: ", np.shape(labels)
             feed_dict = {
                 self.images: images,
                 self.labels: labels,
                 self.learning_rate: learning_rate,
                 self.is_training: True,
             }
+            # print "Labels size: ", np.shape(self.labels)
             fetches = [self.train_step, self.cross_entropy, self.accuracy]
             result = self.sess.run(fetches, feed_dict=feed_dict)
             _, loss, accuracy = result
