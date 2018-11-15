@@ -5,3 +5,6 @@ __pycache__
 saves/
 logs/
 TODO
+.DS_Store
+data_providers/.DS_Store
+test*
